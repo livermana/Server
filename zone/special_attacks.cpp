@@ -69,6 +69,7 @@ int Mob::GetBaseSkillDamage(EQEmu::skills::SkillType skill, Mob *target)
 			if (inst)
 				ac_bonus = inst->GetItemArmorClass(true) / 25.0f;
 		}
+		
 		if (ac_bonus > skill_bonus)
 			ac_bonus = skill_bonus;
 		return static_cast<int>(ac_bonus + skill_bonus);
@@ -123,10 +124,18 @@ int Mob::GetBaseSkillDamage(EQEmu::skills::SkillType skill, Mob *target)
 			}
 		} else if (IsNPC()) {
 			auto *npc = CastToNPC();
-			base = std::max(base, npc->GetBaseDamage());
+			//base damage is max-min / 1.9, thus makes no reasl sense. lower the min, harder it hits. 
+			//based off reports of water pet dmg, it should be 3x of max hit. (if 68 max, it should be a 204 back stab)c 
+			//http://wiki.project1999.com/Pet_Guide
+
+			//old code
+			//base = std::max(base, npc->GetBaseDamage());
 			// parses show relatively low BS mods from lots of NPCs, so either their BS skill is super low
 			// or their mod is divided again, this is probably not the right mod, but it's better
-			skill_bonus /= 3.0f;
+			//skill_bonus /= 3.0f;
+			
+			skill_bonus = -0.5; //so we multiply by 1.5 of the max dmg so it bcomes 3x on the final calc with the 2.0 below.
+			base = npc->GetMaxDMG();
 		}
 		// ahh lets make sure everything is casted right :P ugly but w/e
 		return static_cast<int>(static_cast<float>(base) * (skill_bonus + 2.0f));
@@ -454,8 +463,24 @@ int Mob::MonkSpecialAttack(Mob *other, uint8 unchecked_type)
 	switch (unchecked_type) {
 	case EQEmu::skills::SkillFlyingKick:
 		skill_type = EQEmu::skills::SkillFlyingKick;
-		max_dmg = GetBaseSkillDamage(skill_type);
-		min_dmg = 0; // revamped FK formula is missing the min mod?
+		if (IsNPC())
+		{
+			//tried a lot of differnt ways to fix this
+			//gave up and did 1.2x dmg for the hit for flying kick
+			//pets tend to use their max hit as part of their equation, vs skill + equipment on feet
+			auto *npc = CastToNPC();
+			max_dmg = (npc->GetMaxDMG());
+			min_dmg = (npc->GetMaxDMG()*1.2) - max_dmg; //min dmg is applied at the end for whateve reason
+			max_dmg = max_dmg / 2; // can be multiplied by 2x in dmg calcs, so devide to get what we wanat now.
+		}
+		else
+		{
+			max_dmg = GetBaseSkillDamage(skill_type);
+			min_dmg = 0; // revamped FK formula is missing the min mod?
+
+		}
+
+
 		DoAnim(animFlyingKick, 0, false);
 		reuse = FlyingKickReuseTime;
 		break;
