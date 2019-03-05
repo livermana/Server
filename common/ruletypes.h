@@ -564,6 +564,7 @@ RULE_BOOL(Aggro, UseLevelAggro, true) // MinAggroLevel rule value+ and Undead wi
 RULE_INT(Aggro, ClientAggroCheckInterval, 6) // Interval in which clients actually check for aggro - in seconds
 RULE_REAL(Aggro, PetAttackRange, 40000.0) // max squared range /pet attack works at default is 200
 RULE_BOOL(Aggro, NPCAggroMaxDistanceEnabled, true) /* If enabled, NPC's will drop aggro beyond 600 units or what is defined at the zone level */
+RULE_INT(Aggro, PetCanTankIfHateListUnderOrEqual, 0)
 RULE_CATEGORY_END()
 
 RULE_CATEGORY(TaskSystem)

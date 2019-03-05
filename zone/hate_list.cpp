@@ -364,7 +364,8 @@ Mob *HateList::GetEntWithMostHateOnList(Mob *center, Mob *skip)
 					aggro_mod += RuleI(Aggro, SittingAggroMod);
 				}
 #else
-			if (cur->entity_on_hatelist->IsClient()){
+			if (cur->entity_on_hatelist->IsClient())
+			{
 
 				if (cur->entity_on_hatelist->CastToClient()->IsSitting()){
 					aggro_mod += RuleI(Aggro, SittingAggroMod);
@@ -436,7 +437,12 @@ Mob *HateList::GetEntWithMostHateOnList(Mob *center, Mob *skip)
 			}
 
 			if (!isTopClientType) {
-				if (top_hate->GetSpecialAbility(ALLOW_TO_TANK)){
+				
+				if (top_hate->GetSpecialAbility(ALLOW_TO_TANK) ||
+					//If pet, run rule to see if allow to tank
+					(RuleI(Aggro, PetCanTankIfHateListUnderOrEqual)>0 && list.size()<= (RuleI(Aggro, PetCanTankIfHateListUnderOrEqual))))
+				{
+					
 					isTopClientType = true;
 					top_client_type_in_range = top_hate;
 				}
