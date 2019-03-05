@@ -546,6 +546,7 @@ RULE_REAL(NPC, NPCHealOnGateAmount, 25) // How much the npc will heal on gate if
 RULE_CATEGORY_END()
 
 RULE_CATEGORY(Aggro)
+RULE_BOOL(Aggro, PetsAggroIndifferent, false)
 RULE_BOOL(Aggro, SmartAggroList, true)
 RULE_INT(Aggro, SittingAggroMod, 35) //35%
 RULE_INT(Aggro, MeleeRangeAggroMod, 10) //10%

@@ -310,8 +310,16 @@ bool Mob::CheckWillAggro(Mob *mob) {
 
 	//Image: Get their current target and faction value now that its required
 	//this function call should seem backwards
-	FACTION_VALUE fv = mob->GetReverseFactionCon(this);
-
+	FACTION_VALUE fv;
+	
+	if (RuleB(Aggro, PetsAggroIndifferent) && mob->IsPet())
+	{
+		fv = FACTION_INDIFFERENT;
+	}
+	else
+	{
+		fv = mob->GetReverseFactionCon(this);
+	}
 	// Make sure they're still in the zone
 	// Are they in range?
 	// Are they kos?
