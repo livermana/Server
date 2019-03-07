@@ -250,6 +250,20 @@ void Mob::MakePoweredPet(uint16 spell_id, const char* pettype, int16 petpower,
 		record.petpower = act_power;
 	}
 
+	if (IsClient() && RuleI(Pets, CanScaleWithCasterUpToLevels)>0)
+	{
+		//make pet same level as summoner, up to +12. lvl 60 mage should have lvl 60 pet.
+		auto client = CastToClient();
+		int levelToBe = npc_type->level+ RuleI(Pets, CanScaleWithCasterUpToLevels); //scale up to 12 levels
+		if (client->level < levelToBe)
+		{
+			levelToBe = client->level;
+		}
+		
+		npc_type->level = levelToBe;
+		npc_type->max_hp = npc_type->max_hp + ((client->GetBaseHP()+client->GetItemHPBonuses()) / 5);
+	}
+
 	//Live AA - Elemental Durability
 	int16 MaxHP = aabonuses.PetMaxHP + itembonuses.PetMaxHP + spellbonuses.PetMaxHP;
 

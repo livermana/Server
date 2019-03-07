@@ -200,6 +200,7 @@ RULE_REAL(Pets, AttackCommandRange, 150)
 RULE_BOOL(Pets, UnTargetableSwarmPet, false)
 RULE_REAL(Pets, PetPowerLevelCap, 10) // Max number of levels your pet can go up with pet power
 RULE_BOOL(Pets, CanTakeNoDrop, false) // Can everyone trade nodrop gear to pets
+RULE_INT(Pets, CanScaleWithCasterUpToLevels, 0)
 RULE_CATEGORY_END()
 
 RULE_CATEGORY(GM)
