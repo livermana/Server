@@ -3809,44 +3809,61 @@ void ZoneDatabase::SavePetInfoQuery(Client *client, std::string& query)
 		
 		// pet buffs!
 		int max_slots = RuleI(Spells, MaxTotalSlotsPET);
-		unsigned int sizeOfQuery = query.length();
+		
+		bool addedToQuery = false;
 		for (int index = 0; index < max_slots; index++) {
+			
 			if (petinfo->Buffs[index].spellid == SPELL_UNKNOWN || petinfo->Buffs[index].spellid == 0)
+			{
 				continue;
+			}
+			addedToQuery = true;
 			if (query.length() == 0)
+			{
+		
 				query += StringFormat("INSERT INTO `character_pet_buffs` "
-					"(`char_id`, `pet`, `slot`, `spell_id`, `caster_level`, "
-					"`ticsremaining`, `counters`, `instrument_mod`) "
-					"VALUES (%u, %u, %u, %u, %u, %d, %d, %u)",
-					client->CharacterID(), pet, index, petinfo->Buffs[index].spellid,
-					petinfo->Buffs[index].level, petinfo->Buffs[index].duration,
-					petinfo->Buffs[index].counters, petinfo->Buffs[index].bard_modifier);
+				"(`char_id`, `pet`, `slot`, `spell_id`, `caster_level`, "
+				"`ticsremaining`, `counters`, `instrument_mod`) "
+				"VALUES (%u, %u, %u, %u, %u, %d, %d, %u)",
+				client->CharacterID(), pet, index, petinfo->Buffs[index].spellid,
+				petinfo->Buffs[index].level, petinfo->Buffs[index].duration,
+				petinfo->Buffs[index].counters, petinfo->Buffs[index].bard_modifier);
+			}
 			else
+			{
 				query += StringFormat(", (%u, %u, %u, %u, %u, %d, %d, %u)",
 					client->CharacterID(), pet, index, petinfo->Buffs[index].spellid,
 					petinfo->Buffs[index].level, petinfo->Buffs[index].duration,
 					petinfo->Buffs[index].counters, petinfo->Buffs[index].bard_modifier);
+			}
 		}
-		if (query.length() > sizeOfQuery)
+		if (addedToQuery)
 		{
 			query += ";";
 
 		}
-		unsigned int sizeOfQuery2 = query.length();
+		addedToQuery = false;
 		// pet inventory!
 		for (int index = EQEmu::invslot::EQUIPMENT_BEGIN; index <= EQEmu::invslot::EQUIPMENT_END; index++) {
+		
 			if (!petinfo->Items[index])
+			{
 				continue;
-
+			}
+			addedToQuery = true;
 			if (query.length() == 0)
+			{
 				query += StringFormat("INSERT INTO `character_pet_inventory` "
 					"(`char_id`, `pet`, `slot`, `item_id`) "
 					"VALUES (%u, %u, %u, %u)",
 					client->CharacterID(), pet, index, petinfo->Items[index]);
+			}
 			else
+			{
 				query += StringFormat(", (%u, %u, %u, %u)", client->CharacterID(), pet, index, petinfo->Items[index]);
+			}
 		}
-		if (query.length() > sizeOfQuery2)
+		if (addedToQuery)
 		{
 			query += ";";
 
