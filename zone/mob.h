@@ -199,6 +199,7 @@ public:
 	bool CheckHitChance(Mob* attacker, DamageHitInfo &hit);
 	void TryCriticalHit(Mob *defender, DamageHitInfo &hit, ExtraAttackOptions *opts = nullptr);
 	void TryPetCriticalHit(Mob *defender, DamageHitInfo &hit);
+	void TryCriticalHitLegacy(Mob * defender, DamageHitInfo & hit, ExtraAttackOptions * opts);
 	virtual bool TryFinishingBlow(Mob *defender, int &damage);
 	int TryHeadShot(Mob* defender, EQEmu::skills::SkillType skillInUse);
 	int TryAssassinate(Mob* defender, EQEmu::skills::SkillType skillInUse);

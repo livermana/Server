@@ -411,6 +411,8 @@ RULE_BOOL(Spells, NPCSpellPush, false) // enable spell push on NPCs
 RULE_CATEGORY_END()
 
 RULE_CATEGORY(Combat)
+RULE_INT(Combat, ClientBaseCritChance,0)
+RULE_INT(Combat, WarBerBaseCritChance,0)
 RULE_INT(Combat, PetBaseCritChance, 0) // Pet Base crit chance
 RULE_INT(Combat, NPCBashKickLevel, 6) //The level that npcs can KICK/BASH
 RULE_INT(Combat, NPCBashKickStunChance, 15) //Percent chance that a bash/kick will stun

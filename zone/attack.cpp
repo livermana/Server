@@ -4177,8 +4177,27 @@ void Mob::TryPetCriticalHit(Mob *defender, DamageHitInfo &hit)
 		// For pets use PetCriticalHit for base chance, pets do not innately critical with without it
 		critChance += CritPetChance;
 
+
+	int dex_bonus = GetDEX();
+	if (dex_bonus > 255)
+		dex_bonus = 255 + ((dex_bonus - 255) / 5);
+	dex_bonus += 45; // chances did not match live without a small boost
+
+					 // so if we have an innate crit we have a better chance, except for ber throwing
+	dex_bonus += dex_bonus * critChance / 100;
+
+
+	// dex_bonus / difficulty  = % chance to crit, add it to the crit_chance.
+	int difficulty = RuleI(Combat, MeleeCritDifficulty);
+	int addedCritPercent =(int) (((float)dex_bonus / (float)difficulty) * 10000); //x100 to get from dec to int
+	
+	critChance = critChance * 100;
+	critChance += addedCritPercent;
+
 	if (critChance > 0) {
-		if (zone->random.Roll(critChance)) {
+		int roll = zone->random.Int(1, 10000);
+
+		if (roll<critChance) {
 			critMod += GetCritDmgMod(hit.skill);
 			hit.damage_done += 5;
 			hit.damage_done = (hit.damage_done * critMod) / 100;
@@ -4197,9 +4216,228 @@ void Mob::TryPetCriticalHit(Mob *defender, DamageHitInfo &hit)
 		}
 	}
 }
+void Mob::TryCriticalHitLegacy(Mob *defender, DamageHitInfo &hit, ExtraAttackOptions *opts)
+{
+	if (hit.damage_done < 1 || !defender)
+		return;
 
+	// decided to branch this into it's own function since it's going to be duplicating a lot of the
+	// code in here, but could lead to some confusion otherwise
+	if ((IsPet() && GetOwner()->IsClient()) || (IsNPC() && CastToNPC()->GetSwarmOwner())) {
+		TryPetCriticalHit(defender, hit);
+		return;
+	}
+
+#ifdef BOTS
+	if (this->IsPet() && this->GetOwner() && this->GetOwner()->IsBot()) {
+		this->TryPetCriticalHit(defender, hit);
+		return;
+	}
+#endif // BOTS
+
+	if (IsNPC() && !RuleB(Combat, NPCCanCrit))
+		return;
+
+	// 1: Try Slay Undead
+	if (defender->GetBodyType() == BT_Undead || defender->GetBodyType() == BT_SummonedUndead ||
+		defender->GetBodyType() == BT_Vampire) {
+		int SlayRateBonus = aabonuses.SlayUndead[0] + itembonuses.SlayUndead[0] + spellbonuses.SlayUndead[0];
+		if (SlayRateBonus) {
+			float slayChance = static_cast<float>(SlayRateBonus) / 10000.0f;
+			if (zone->random.Roll(slayChance)) {
+				int SlayDmgBonus = std::max(
+					{ aabonuses.SlayUndead[1], itembonuses.SlayUndead[1], spellbonuses.SlayUndead[1] });
+				hit.damage_done = std::max(hit.damage_done, hit.base_damage) + 5;
+				hit.damage_done = (hit.damage_done * SlayDmgBonus) / 100;
+
+				/* Female */
+				if (GetGender() == 1) {
+					entity_list.FilteredMessageClose_StringID(
+						this, /* Sender */
+						false, /* Skip Sender */
+						RuleI(Range, CriticalDamage),
+						MT_CritMelee, /* Type: 301 */
+						FilterMeleeCrits, /* FilterType: 12 */
+						FEMALE_SLAYUNDEAD, /* MessageFormat: %1's holy blade cleanses her target!(%2) */
+						GetCleanName(), /* Message1 */
+						itoa(hit.damage_done + hit.min_damage) /* Message2 */
+					);
+				}
+				/* Males and Neuter */
+				else {
+					entity_list.FilteredMessageClose_StringID(
+						this, /* Sender */
+						false, /* Skip Sender */
+						RuleI(Range, CriticalDamage),
+						MT_CritMelee, /* Type: 301 */
+						FilterMeleeCrits, /* FilterType: 12 */
+						MALE_SLAYUNDEAD, /* MessageFormat: %1's holy blade cleanses his target!(%2)  */
+						GetCleanName(), /* Message1 */
+						itoa(hit.damage_done + hit.min_damage) /* Message2 */
+					);
+				}
+				return;
+			}
+		}
+	}
+
+	// 2: Try Melee Critical
+	// a lot of good info: http://giline.versus.jp/shiden/damage_e.htm, http://giline.versus.jp/shiden/su.htm
+	int currentCritPercent = RuleI(Combat, ClientBaseCritChance) * 100;
+
+	// We either require an innate crit chance or some SPA 169 to crit
+	bool innate_crit = false;
+	int crit_chance = GetCriticalChanceBonus(hit.skill);
+	if ((GetClass() == WARRIOR || GetClass() == BERSERKER) && GetLevel() >= 12)
+	{
+		innate_crit = true;
+		currentCritPercent += RuleI(Combat, WarBerBaseCritChance) * 100;
+
+	}
+	else if (GetClass() == RANGER && GetLevel() >= 12 && hit.skill == EQEmu::skills::SkillArchery)
+		innate_crit = true;
+	else if (GetClass() == ROGUE && GetLevel() >= 12 && hit.skill == EQEmu::skills::SkillThrowing)
+		innate_crit = true;
+
+	// we have a chance to crit!
+	if (innate_crit || crit_chance  || currentCritPercent) {
+		int difficulty = 0;
+		if (hit.skill == EQEmu::skills::SkillArchery)
+			difficulty = RuleI(Combat, ArcheryCritDifficulty);
+		else if (hit.skill == EQEmu::skills::SkillThrowing)
+			difficulty = RuleI(Combat, ThrowingCritDifficulty);
+		else
+			difficulty = RuleI(Combat, MeleeCritDifficulty);
+		
+		int dex_bonus = GetDEX();
+		if (dex_bonus > 255)
+			dex_bonus = 255 + ((dex_bonus - 255) / 5);
+		dex_bonus += 45; // chances did not match live without a small boost
+
+						 // so if we have an innate crit we have a better chance, except for ber throwing
+		if (!innate_crit || (GetClass() == BERSERKER && hit.skill == EQEmu::skills::SkillThrowing))
+			dex_bonus = dex_bonus * 3 / 5;
+
+		if (crit_chance)
+			dex_bonus += dex_bonus * crit_chance / 100;
+
+
+		// dex_bonus / difficulty  = % chance to crit, add it to the crit_chance.
+
+		int addedCritPercent = (int)(((float)dex_bonus / (float)difficulty) * 10000); //x100 to get from dec to int
+		
+
+		currentCritPercent += addedCritPercent;
+
+
+
+		int roll = zone->random.Int(1, 10000);
+	
+			
+			// check if we crited
+		if (roll < currentCritPercent) {
+			// step 1: check for finishing blow
+			if (TryFinishingBlow(defender, hit.damage_done))
+				return;
+
+			// step 2: calculate damage
+			hit.damage_done = std::max(hit.damage_done, hit.base_damage) + 5;
+			int og_damage = hit.damage_done;
+			int crit_mod = 170 + GetCritDmgMod(hit.skill);
+			if (crit_mod < 100) {
+				crit_mod = 100;
+			}
+
+			hit.damage_done = hit.damage_done * crit_mod / 100;
+			Log(Logs::Detail, Logs::Combat,
+				"Crit success roll %d dex chance %d og dmg %d crit_mod %d new dmg %d", roll, dex_bonus,
+				og_damage, crit_mod, hit.damage_done);
+
+			// step 3: check deadly strike
+			if (GetClass() == ROGUE && hit.skill == EQEmu::skills::SkillThrowing) {
+				if (BehindMob(defender, GetX(), GetY())) {
+					int chance = GetLevel() * 12;
+					if (zone->random.Int(1, 1000) < chance) {
+						// step 3a: check assassinate
+						int assdmg = TryAssassinate(defender, hit.skill); // I don't think this is right
+						if (assdmg) {
+							hit.damage_done = assdmg;
+							return;
+						}
+						hit.damage_done = hit.damage_done * 200 / 100;
+
+						entity_list.FilteredMessageClose_StringID(
+							this, /* Sender */
+							false, /* Skip Sender */
+							RuleI(Range, CriticalDamage),
+							MT_CritMelee, /* Type: 301 */
+							FilterMeleeCrits, /* FilterType: 12 */
+							DEADLY_STRIKE, /* MessageFormat: %1 scores a Deadly Strike!(%2) */
+							GetCleanName(), /* Message1 */
+							itoa(hit.damage_done + hit.min_damage) /* Message2 */
+						);
+						return;
+					}
+				}
+			}
+
+			// step 4: check crips
+			// this SPA was reused on live ...
+			bool berserk = spellbonuses.BerserkSPA || itembonuses.BerserkSPA || aabonuses.BerserkSPA;
+			if (!berserk) {
+				if (zone->random.Roll(GetCrippBlowChance())) {
+					berserk = true;
+				} // TODO: Holyforge is suppose to have an innate extra undead chance? 1/5 which matches the SPA crip though ...
+			}
+
+			if (IsBerserk() || berserk) {
+				hit.damage_done += og_damage * 119 / 100;
+				Log(Logs::Detail, Logs::Combat, "Crip damage %d", hit.damage_done);
+
+				entity_list.FilteredMessageClose_StringID(
+					this, /* Sender */
+					false, /* Skip Sender */
+					RuleI(Range, CriticalDamage),
+					MT_CritMelee, /* Type: 301 */
+					FilterMeleeCrits, /* FilterType: 12 */
+					CRIPPLING_BLOW, /* MessageFormat: %1 lands a Crippling Blow!(%2) */
+					GetCleanName(), /* Message1 */
+					itoa(hit.damage_done + hit.min_damage) /* Message2 */
+				);
+
+				// Crippling blows also have a chance to stun
+				// Kayen: Crippling Blow would cause a chance to interrupt for npcs < 55, with a
+				// staggers message.
+				if (defender->GetLevel() <= 55 && !defender->GetSpecialAbility(UNSTUNABLE)) {
+					defender->Emote("staggers.");
+					defender->Stun(2000);
+				}
+				return;
+			}
+
+			/* Normal Critical hit message */
+			entity_list.FilteredMessageClose_StringID(
+				this, /* Sender */
+				false, /* Skip Sender */
+				RuleI(Range, CriticalDamage),
+				MT_CritMelee, /* Type: 301 */
+				FilterMeleeCrits, /* FilterType: 12 */
+				CRITICAL_HIT, /* MessageFormat: %1 scores a critical hit! (%2) */
+				GetCleanName(), /* Message1 */
+				itoa(hit.damage_done + hit.min_damage) /* Message2 */
+			);
+		}
+	}
+
+}
 void Mob::TryCriticalHit(Mob *defender, DamageHitInfo &hit, ExtraAttackOptions *opts)
 {
+
+	if (RuleI(Combat, ClientBaseCritChance) > 0 || RuleI(Combat, WarBerBaseCritChance) > 0)
+	{
+		TryCriticalHitLegacy(defender, hit, opts);
+	}
+
 #ifdef LUA_EQEMU
 	bool ignoreDefault = false;
 	LuaParser::Instance()->TryCriticalHit(this, defender, hit, opts, ignoreDefault);
