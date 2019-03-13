@@ -177,7 +177,13 @@ int32 Mob::GetActDoTDamage(uint16 spell_id, int32 value, Mob* target) {
 	int32 value_BaseEffect = 0;
 	int32 extra_dmg = 0;
 	int16 chance = 0;
-	chance += itembonuses.CriticalDoTChance + spellbonuses.CriticalDoTChance + aabonuses.CriticalDoTChance;
+
+	if (IsClient() || (IsPet() && CastToNPC()->GetOwner()->IsClient()))
+	{
+		chance = RuleI(Spells, BaseCritChance); 
+		chance += itembonuses.CriticalDoTChance + spellbonuses.CriticalDoTChance + aabonuses.CriticalDoTChance;
+
+	}
 
 	if (spellbonuses.CriticalDotDecay)
 		chance += GetDecayEffectValue(spell_id, SE_CriticalDotDecay);
@@ -207,6 +213,10 @@ int32 Mob::GetActDoTDamage(uint16 spell_id, int32 value, Mob* target) {
 		}
 
 		value -= extra_dmg;
+
+		if (IsClient())
+			Message_StringID(MT_SpellCrits, YOU_CRIT_BLAST, itoa(-value));
+
 	}
 	else {
 
