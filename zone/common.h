@@ -293,6 +293,7 @@ struct Buffs_Struct {
 	bool	persistant_buff;
 	bool	client; //True if the caster is a client
 	bool	UpdateClient;
+	bool    InogreAllEffects; //used for DoT's if there are other effects to them.
 };
 
 struct StatBonuses {

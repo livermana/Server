@@ -1541,7 +1541,7 @@ void Mob::CalcSpellBonuses(StatBonuses* newbon)
 
 	int buff_count = GetMaxTotalSlots();
 	for(i = 0; i < buff_count; i++) {
-		if(buffs[i].spellid != SPELL_UNKNOWN){
+		if(buffs[i].spellid != SPELL_UNKNOWN && !buffs[i].InogreAllEffects){
 			ApplySpellsBonuses(buffs[i].spellid, buffs[i].casterlevel, newbon, buffs[i].casterid, 0, buffs[i].ticsremaining, i, buffs[i].instrument_mod);
 
 			if (buffs[i].numhits > 0)
@@ -1556,7 +1556,7 @@ void Mob::CalcSpellBonuses(StatBonuses* newbon)
 	//Removes the spell bonuses that are effected by a 'negate' debuff.
 	if (spellbonuses.NegateEffects){
 		for(i = 0; i < buff_count; i++) {
-			if( (buffs[i].spellid != SPELL_UNKNOWN) && (IsEffectInSpell(buffs[i].spellid, SE_NegateSpellEffect)) )
+			if( (buffs[i].spellid != SPELL_UNKNOWN && !buffs[i].InogreAllEffects) && (IsEffectInSpell(buffs[i].spellid, SE_NegateSpellEffect)) )
 				NegateSpellsBonuses(buffs[i].spellid);
 		}
 	}

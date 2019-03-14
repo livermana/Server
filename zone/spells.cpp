@@ -2818,6 +2818,7 @@ int CalcBuffDuration_formula(int level, int formula, int duration)
 // 0 if not the same type, no action needs to be taken
 // 1 if spellid1 should be removed (overwrite)
 // -1 if they can't stack and spellid2 should be stopped
+// -2 they can't stack but there is a dmg portion, so only do damage portion.
 //currently, a spell will not land if it would overwrite a better spell on any effect
 //if all effects are better or the same, we overwrite, else we do nothing
 int Mob::CheckStackConflict(uint16 spellid1, int caster_level1, uint16 spellid2, int caster_level2, Mob* caster1, Mob* caster2, int buffslot)
@@ -2828,6 +2829,7 @@ int Mob::CheckStackConflict(uint16 spellid1, int caster_level1, uint16 spellid2,
 	int i, effect1, effect2, sp1_value, sp2_value;
 	int blocked_effect, blocked_below_value, blocked_slot;
 	int overwrite_effect, overwrite_below_value, overwrite_slot;
+	const Buffs_Struct &curbuf = buffs[buffslot];
 
 	Log(Logs::Detail, Logs::Spells, "Check Stacking on old %s (%d) @ lvl %d (by %s) vs. new %s (%d) @ lvl %d (by %s)", sp1.name, spellid1, caster_level1, (caster1==nullptr)?"Nobody":caster1->GetName(), sp2.name, spellid2, caster_level2, (caster2==nullptr)?"Nobody":caster2->GetName());
 
@@ -2990,6 +2992,8 @@ int Mob::CheckStackConflict(uint16 spellid1, int caster_level1, uint16 spellid2,
 	// effect slot, otherwise they're stackable, even if it's the same effect
 	bool will_overwrite = false;
 	bool values_equal = true;
+	bool effect_is_dot = false;
+	bool cannot_stack = false;
 	for(i = 0; i < EFFECT_COUNT; i++)
 	{
 		if(IsBlankSpellEffect(spellid1, i) || IsBlankSpellEffect(spellid2, i))
@@ -3009,6 +3013,11 @@ int Mob::CheckStackConflict(uint16 spellid1, int caster_level1, uint16 spellid2,
 		    GetSpellLevel(spellid2, BARD) != 255)
 			continue;
 
+		if (effect1 == SE_CurrentHPOnce)
+		{
+			effect_is_dot = true;
+			continue;
+		}
 		// big ol' list according to the client, wasn't that nice!
 		if (IsEffectIgnoredInStacking(effect1))
 			continue;
@@ -3026,6 +3035,7 @@ int Mob::CheckStackConflict(uint16 spellid1, int caster_level1, uint16 spellid2,
 		if(IsNPC() && caster1 && caster2 && caster1 != caster2) {
 			if(effect1 == SE_CurrentHP && sp1_detrimental && sp2_detrimental) {
 				Log(Logs::Detail, Logs::Spells, "Both casters exist and are not the same, the effect is a detrimental dot, moving on");
+				effect_is_dot = true;
 				continue;
 			}
 		}
@@ -3041,6 +3051,7 @@ int Mob::CheckStackConflict(uint16 spellid1, int caster_level1, uint16 spellid2,
 		*/
 		if(effect1 == SE_CurrentHP && spellid1 != spellid2 && sp1_detrimental && sp2_detrimental) {
 			Log(Logs::Detail, Logs::Spells, "The spells are not the same and it is a detrimental dot, passing");
+			effect_is_dot = true;
 			continue;
 		}
 
@@ -3067,7 +3078,9 @@ int Mob::CheckStackConflict(uint16 spellid1, int caster_level1, uint16 spellid2,
 		if(sp2_value < sp1_value) {
 			Log(Logs::Detail, Logs::Spells, "Spell %s (value %d) is not as good as %s (value %d). Rejecting %s.",
 				sp2.name, sp2_value, sp1.name, sp1_value, sp2.name);
-			return -1;	// can't stack
+			cannot_stack = true;
+			continue;
+			//return -1;	// can't stack
 		}
 		if (sp2_value != sp1_value)
 			values_equal = false;
@@ -3077,6 +3090,33 @@ int Mob::CheckStackConflict(uint16 spellid1, int caster_level1, uint16 spellid2,
 		Log(Logs::Detail, Logs::Spells, "Spell %s (value %d) is not as good as %s (value %d). We will overwrite %s if there are no other conflicts.",
 			sp1.name, sp1_value, sp2.name, sp2_value, sp1.name);
 		will_overwrite = true;
+	}
+
+	if (effect_is_dot)
+	{
+		if ((cannot_stack) && caster1 != caster2)
+		{
+			return -2; //notify it will not normally stack but it has  dot component which should be applied. 
+		}
+		else if (cannot_stack && caster1 == caster2)
+		{
+			return 1; //overwrite our own buffs though.
+		}
+		else if (will_overwrite && curbuf.InogreAllEffects && caster1 != caster2)
+		{
+			return 0; //not our spell, and only dot portion here, ignore it.
+
+		}
+		else if (will_overwrite && !curbuf.InogreAllEffects && caster1 != caster2)
+		{
+			return -2; //not our spell, and full version,  respond that we only want our dot portion added.
+
+		}
+		else if (will_overwrite && curbuf.InogreAllEffects && caster1 == caster2)
+		{
+			return -3;//our spell, and its dot only, so update it to be dot only./refresh
+		}
+		//else it will replace what is there not ignoring the dot damage.
 	}
 
 	//if we get here, then none of the values on the new spell are "worse"
@@ -3199,6 +3239,8 @@ int Mob::AddBuff(Mob *caster, uint16 spell_id, int duration, int32 level_overrid
 	int buff_count = GetMaxTotalSlots();
 	uint32 start_slot = GetFirstBuffSlot(IsDisciplineBuff(spell_id), spells[spell_id].short_buff_box);
 	uint32 end_slot = GetLastBuffSlot(IsDisciplineBuff(spell_id), spells[spell_id].short_buff_box);
+	bool damage_only_dot = false;
+	bool overwriting_own_spell = false;
 
 	for (buffslot = 0; buffslot < buff_count; buffslot++) {
 		const Buffs_Struct &curbuf = buffs[buffslot];
@@ -3215,12 +3257,24 @@ int Mob::AddBuff(Mob *caster, uint16 spell_id, int duration, int32 level_overrid
 				}
 				return -1;
 			}
-			if (ret == 1) {	// set a flag to indicate that there will be overwriting
+			else if (ret == 1) {	// set a flag to indicate that there will be overwriting
 				Log(Logs::Detail, Logs::Spells, "Adding buff %d will overwrite spell %d in slot %d with caster level %d",
 						spell_id, curbuf.spellid, buffslot, curbuf.casterlevel);
 				// If this is the first buff it would override, use its slot
 				if (!will_overwrite && !IsDisciplineBuff(spell_id))
 					emptyslot = buffslot;
+				will_overwrite = true;
+				overwrite_slots.push_back(buffslot);
+			}
+			else if (ret == -2)
+			{
+				damage_only_dot = true;
+			}
+			else if (ret == -3)
+			{
+				if (!will_overwrite && !IsDisciplineBuff(spell_id))
+					emptyslot = buffslot;
+				damage_only_dot = true;
 				will_overwrite = true;
 				overwrite_slots.push_back(buffslot);
 			}
@@ -3296,6 +3350,7 @@ int Mob::AddBuff(Mob *caster, uint16 spell_id, int duration, int32 level_overrid
 	buffs[emptyslot].ExtraDIChance = 0;
 	buffs[emptyslot].RootBreakChance = 0;
 	buffs[emptyslot].instrument_mod = caster ? caster->GetInstrumentMod(spell_id) : 10;
+	buffs[emptyslot].InogreAllEffects = damage_only_dot; //if a dot but would normally not stack, allow dot to work but effects not to.
 
 	if (level_override > 0) {
 		buffs[emptyslot].UpdateClient = true;
@@ -3349,6 +3404,7 @@ int Mob::CanBuffStack(uint16 spellid, uint8 caster_level, bool iFailIfOverwrite)
 	Log(Logs::Detail, Logs::AI, "Checking if buff %d cast at level %d can stack on me.%s", spellid, caster_level, iFailIfOverwrite?" failing if we would overwrite something":"");
 
 	int buff_count = GetMaxTotalSlots();
+	bool cannot_stack_but_dot = false;
 	for (i=0; i < buff_count; i++)
 	{
 		const Buffs_Struct &curbuf = buffs[i];
@@ -3380,6 +3436,17 @@ int Mob::CanBuffStack(uint16 spellid, uint8 caster_level, bool iFailIfOverwrite)
 			
 			Log(Logs::Detail, Logs::AI, "Buff %d would conflict with %d in slot %d, reporting stack failure", spellid, curbuf.spellid, i);
 			return -1;	// stop the spell, can't stack it
+		}
+		if (ret == -2)
+		{
+			cannot_stack_but_dot = true;
+			if (firstfree == -2)
+				firstfree = i;
+		}
+		if (ret == -3)
+		{
+			if (firstfree == -2)
+				firstfree = i;
 		}
 	}
 
