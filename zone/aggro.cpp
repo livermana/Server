@@ -503,17 +503,17 @@ void EntityList::AIYellForHelp(Mob* sender, Mob* attacker) {
 			//then jump in if they are our friend
 			if(mob->GetLevel() >= 50 || attacker->GetLevelCon(mob->GetLevel()) != CON_GRAY)
 			{
-				bool useprimfaction = false;
+				bool assistfaction = false;
 				if(mob->GetPrimaryFaction() == sender->CastToNPC()->GetPrimaryFaction())
 				{
 					const NPCFactionList *cf = database.GetNPCFactionEntry(mob->GetNPCFactionID());
 					if(cf){
-						if(cf->assistprimaryfaction != 0)
-							useprimfaction = true;
+						assistfaction = cf->assistprimaryfaction;
 					}
 				}
 
-				if(useprimfaction || sender->GetReverseFactionCon(mob) <= FACTION_AMIABLE )
+				//if(assistfaction || sender->GetReverseFactionCon(mob) >= FACTION_AMIABLE )
+				if (assistfaction || sender->GetReverseFactionCon(mob) >= FACTION_AMIABLE)
 				{
 					//attacking someone on same faction, or a friend
 					//Father Nitwit: make sure we can see them.
