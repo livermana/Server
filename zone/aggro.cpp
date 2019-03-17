@@ -504,25 +504,30 @@ void EntityList::AIYellForHelp(Mob* sender, Mob* attacker) {
 			if(mob->GetLevel() >= 50 || attacker->GetLevelCon(mob->GetLevel()) != CON_GRAY)
 			{
 				bool assistfaction = false;
+				bool sameFaction = false;
 				if(mob->GetPrimaryFaction() == sender->CastToNPC()->GetPrimaryFaction())
 				{
+					sameFaction = true;
 					const NPCFactionList *cf = database.GetNPCFactionEntry(mob->GetNPCFactionID());
 					if(cf){
 						assistfaction = cf->assistprimaryfaction;
 					}
 				}
 
-				//if(assistfaction || sender->GetReverseFactionCon(mob) >= FACTION_AMIABLE )
-				if (assistfaction || sender->GetReverseFactionCon(mob) >= FACTION_AMIABLE)
+				//note if on the same faction, they are considered ally 
+				//so if assist faction = false we ignore this
+				FACTION_VALUE rfv = sender->GetReverseFactionCon(mob);
+				
+				if ((sameFaction && assistfaction) || (!sameFaction &&  rfv <= FACTION_AMIABLE))
 				{
 					//attacking someone on same faction, or a friend
 					//Father Nitwit: make sure we can see them.
 					if(mob->CheckLosFN(sender)) {
 #if (EQDEBUG>=5)
-						Log(Logs::General, Logs::None, "AIYellForHelp(\"%s\",\"%s\") %s attacking %s Dist %f Z %f",
+						Log(Logs::General, Logs::None, "AIYellForHelp(\"%s\",\"%s\") %s attacking %s Dist %f Z %f. assistfaction:%i  reversefaction:%i",
 							sender->GetName(), attacker->GetName(), mob->GetName(),
 							attacker->GetName(), DistanceSquared(mob->GetPosition(),
-							sender->GetPosition()), std::abs(sender->GetZ()+mob->GetZ()));
+							sender->GetPosition()), std::abs(sender->GetZ()+mob->GetZ()), assistfaction, rfv);
 #endif
 						mob->AddToHateList(attacker, 25, 0, false);
 						sender->AddAssistCap();
