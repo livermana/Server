@@ -1508,6 +1508,11 @@ bool Client::Attack(Mob* other, int Hand, bool bRiposte, bool IsStrikethrough, b
 
 		my_hit.tohit = GetTotalToHit(my_hit.skill, hit_chance_bonus);
 
+		//save off the min damage to use later
+		my_hit.min_damgae_orginal = my_hit.min_damage;
+		//set new min damage to be current min + base
+		my_hit.min_damage += my_hit.base_damage;
+
 		DoAttack(other, my_hit, opts);
 	}
 	else {
@@ -5323,7 +5328,17 @@ void Mob::CommonOutgoingHitSuccess(Mob* defender, DamageHitInfo &hit, ExtraAttac
 
 	TryCriticalHit(defender, hit, opts);
 
-	hit.damage_done += hit.min_damage;
+	//improve min dmg for melee was set, to use it
+	if (hit.min_damgae_orginal > 0)
+	{
+		hit.damage_done += hit.min_damgae_orginal;
+	}
+	else
+	{
+		//was not set, use original min dmg
+		hit.damage_done += hit.min_damage;
+	}
+	
 	if (IsClient()) {
 		int extra = 0;
 		switch (hit.skill) {
