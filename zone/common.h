@@ -745,7 +745,6 @@ struct DamageHitInfo {
 	int tohit;
 	int hand;
 	EQEmu::skills::SkillType skill;
-	int min_damgae_orginal;
 };
 
 #endif

@@ -961,10 +961,17 @@ void Mob::MeleeMitigation(Mob *attacker, DamageHitInfo &hit, ExtraAttackOptions 
 	}
 
 	auto roll = RollD20(hit.offense, mitigation);
-
+	if (attacker->IsClient())
+	{
+		//client AC vs other, ac can only remove the ability to do 2x dmg base.
+		if (roll < 1)
+		{
+			roll = 1;
+		}
+	}
 	// +0.5 for rounding, min to 1 dmg
 	hit.damage_done = std::max(static_cast<int>(roll * static_cast<double>(hit.base_damage) + 0.5), 1);
-
+	
 	Log(Logs::Detail, Logs::Attack, "mitigation %d vs offense %d. base %d rolled %f damage %d", mitigation, hit.offense, hit.base_damage, roll, hit.damage_done);
 }
 
@@ -1508,10 +1515,8 @@ bool Client::Attack(Mob* other, int Hand, bool bRiposte, bool IsStrikethrough, b
 
 		my_hit.tohit = GetTotalToHit(my_hit.skill, hit_chance_bonus);
 
-		//save off the min damage to use later
-		my_hit.min_damgae_orginal = my_hit.min_damage;
-		//set new min damage to be current min + base
-		my_hit.min_damage += my_hit.base_damage;
+		my_hit.min_damage *= 2;//double min damage. 
+
 
 		DoAttack(other, my_hit, opts);
 	}
@@ -5328,16 +5333,10 @@ void Mob::CommonOutgoingHitSuccess(Mob* defender, DamageHitInfo &hit, ExtraAttac
 
 	TryCriticalHit(defender, hit, opts);
 
-	//improve min dmg for melee was set, to use it
-	if (hit.min_damgae_orginal > 0)
-	{
-		hit.damage_done += hit.min_damgae_orginal;
-	}
-	else
-	{
-		//was not set, use original min dmg
-		hit.damage_done += hit.min_damage;
-	}
+	
+	//was not set, use original min dmg
+	hit.damage_done += hit.min_damage;
+	
 	
 	if (IsClient()) {
 		int extra = 0;
