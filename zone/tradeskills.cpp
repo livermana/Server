@@ -370,11 +370,12 @@ void Object::HandleCombine(Client* user, const NewCombine_Struct* in_combine, Ob
 
 	//changing from a switch to string of if's since we don't need to iterate through all of the skills in the SkillType enum
 	if (spec.tradeskill == EQEmu::skills::SkillAlchemy) {
-		if (user_pp.class_ != SHAMAN) {
+		/*if (user_pp.class_ != SHAMAN) {
 			user->Message(13, "This tradeskill can only be performed by a shaman.");
 			return;
 		}
-		else if (user_pp.level < MIN_LEVEL_ALCHEMY) {
+		else*/ 
+		if (user_pp.level < MIN_LEVEL_ALCHEMY) {
 			user->Message(13, "You cannot perform alchemy until you reach level %i.", MIN_LEVEL_ALCHEMY);
 			return;
 		}

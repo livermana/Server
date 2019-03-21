@@ -2310,6 +2310,20 @@ uint16 Mob::MaxSkill_class(uint16 skillid, uint16 class_, uint16 level) const
 		// Shaman
 		case ALCHEMY: {
 				switch (class_) {
+					case WARRIOR:
+					case WARRIORGM:
+					case BEASTLORD:
+					case BEASTLORDGM:
+					case PALADIN:
+					case PALADINGM:
+					case SHADOWKNIGHT:
+					case SHADOWKNIGHTGM:
+					case ROGUE:
+					case ROGUEGM:
+					case BERSERKER:
+					case BERSERKERGM:
+					case MONK:
+					case MONKGM:
 					case SHAMAN:
 					case SHAMANGM: {
 							// 25 130 180
@@ -2328,6 +2342,7 @@ uint16 Mob::MaxSkill_class(uint16 skillid, uint16 class_, uint16 level) const
 					default:
 						r_value = 0;
 						break;
+						
 				}// Class Switch
 				break;
 			}
