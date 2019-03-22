@@ -4446,6 +4446,7 @@ void Mob::TryCriticalHit(Mob *defender, DamageHitInfo &hit, ExtraAttackOptions *
 	if (RuleI(Combat, ClientBaseCritChance) > 0 || RuleI(Combat, WarBerBaseCritChance) > 0)
 	{
 		TryCriticalHitLegacy(defender, hit, opts);
+		return;
 	}
 
 #ifdef LUA_EQEMU
