@@ -108,6 +108,12 @@ uint32 Spawn2::resetTimer()
 {
 	uint32 rspawn = respawn_ * 1000;
 
+	if (zone->GetInstanceID() > 0 && RuleI(Zone, InstanceRespawnDelaySeconds)>0)
+	{
+		//useful for instances that don't respawn until instance is closed.
+		rspawn = RuleI(Zone, InstanceRespawnDelaySeconds)*1000; //*1000 as rspawn is in MS. 
+	}
+
 	if (variance_ != 0) {
 		int var_over_2 = (variance_ * 1000) / 2;
 		rspawn = zone->random.Int(rspawn - var_over_2, rspawn + var_over_2);

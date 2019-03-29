@@ -688,7 +688,7 @@ void Zone::Shutdown(bool quite)
 		return;
 
 	entity_list.StopMobAI();
-
+	database.QGlobalPurge();
 	std::map<uint32,NPCType *>::iterator itr;
 	while(!zone->npctable.empty()) {
 		itr=zone->npctable.begin();
@@ -1280,6 +1280,7 @@ bool Zone::Process() {
 		if(qglobal_purge_timer.Check())
 		{
 			qGlobals->PurgeExpiredGlobals();
+			database.QGlobalPurge();
 		}
 	}
 
