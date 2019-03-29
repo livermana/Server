@@ -1280,7 +1280,6 @@ bool Zone::Process() {
 		if(qglobal_purge_timer.Check())
 		{
 			qGlobals->PurgeExpiredGlobals();
-			database.QGlobalPurge();
 		}
 	}
 
