@@ -3817,8 +3817,8 @@ void ZoneDatabase::SavePetInfoQuery(Client *client, std::string& query)
 			{
 				continue;
 			}
-			addedToQuery = true;
-			if (query.length() == 0)
+			
+			if (addedToQuery == false)
 			{
 		
 				query += StringFormat("INSERT INTO `character_pet_buffs` "
@@ -3828,6 +3828,7 @@ void ZoneDatabase::SavePetInfoQuery(Client *client, std::string& query)
 				client->CharacterID(), pet, index, petinfo->Buffs[index].spellid,
 				petinfo->Buffs[index].level, petinfo->Buffs[index].duration,
 				petinfo->Buffs[index].counters, petinfo->Buffs[index].bard_modifier);
+				addedToQuery = true;
 			}
 			else
 			{
@@ -3850,13 +3851,14 @@ void ZoneDatabase::SavePetInfoQuery(Client *client, std::string& query)
 			{
 				continue;
 			}
-			addedToQuery = true;
-			if (query.length() == 0)
+		
+			if (addedToQuery==false)
 			{
 				query += StringFormat("INSERT INTO `character_pet_inventory` "
 					"(`char_id`, `pet`, `slot`, `item_id`) "
 					"VALUES (%u, %u, %u, %u)",
 					client->CharacterID(), pet, index, petinfo->Items[index]);
+				addedToQuery = true;
 			}
 			else
 			{

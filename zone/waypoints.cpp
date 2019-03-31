@@ -521,6 +521,7 @@ void NPC::AssignWaypoints(int32 grid)
 
 	for (auto row = results.begin(); row != results.end(); ++row, ++max_wp)
 	{
+	
 		wplist newwp;
 		newwp.index = max_wp;
 		newwp.x = atof(row[0]);
@@ -531,6 +532,36 @@ void NPC::AssignWaypoints(int32 grid)
 		newwp.heading = atof(row[4]);
 		Waypoints.push_back(newwp);
 	}
+
+	if (Waypoints.size() == 0)
+	{
+		//something was setup wrong on the grid, default this to two waypoints of its current location.
+		max_wp++;
+		
+		//no waypoints found, add the spawn point as a way point?
+		wplist newwp;
+		newwp.index = max_wp;
+		newwp.x = m_SpawnPoint.x;
+		newwp.y = m_SpawnPoint.y;
+		newwp.z = m_SpawnPoint.z;
+
+		newwp.pause = 10;
+		newwp.heading = m_SpawnPoint.w;
+		Waypoints.push_back(newwp);
+
+		//two waypoints so that it will go back to its normal location if moved.
+		max_wp++;
+		wplist newwp2;
+		newwp2.index = max_wp;
+		newwp2.x = m_SpawnPoint.x;
+		newwp2.y = m_SpawnPoint.y;
+		newwp2.z = m_SpawnPoint.z;
+
+		newwp2.pause = 10;
+		newwp2.heading = m_SpawnPoint.w;
+		Waypoints.push_back(newwp2);
+	}
+
 
 	UpdateWaypoint(0);
 	SetWaypointPause();
