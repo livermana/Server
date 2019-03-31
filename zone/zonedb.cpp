@@ -1498,17 +1498,26 @@ bool ZoneDatabase::SaveCharacterLanguage(uint32 character_id, uint32 lang_id, ui
 	return true;
 }
 
+void ZoneDatabase::SaveCharacterBindPointQuery(uint32 character_id, const BindStruct &bind, uint32 bind_num, std::string& query)
+{
+	/* Save Home Bind Point */
+	query +=StringFormat("REPLACE INTO `character_bind` (id, zone_id, instance_id, x, y, z, heading, slot) VALUES (%u, "
+			"%u, %u, %f, %f, %f, %f, %i);",
+			character_id, bind.zoneId, bind.instance_id, bind.x, bind.y, bind.z, bind.heading, bind_num);
+
+	Log(Logs::General, Logs::None, "ZoneDatabase::SaveCharacterBindPoint for character ID: %i zone_id: %u "
+		"instance_id: %u position: %f %f %f %f bind_num: %u",
+		character_id, bind.zoneId, bind.instance_id, bind.x, bind.y, bind.z, bind.heading, bind_num);
+
+	
+
+}
 bool ZoneDatabase::SaveCharacterBindPoint(uint32 character_id, const BindStruct &bind, uint32 bind_num)
 {
 	/* Save Home Bind Point */
-	std::string query =
-	    StringFormat("REPLACE INTO `character_bind` (id, zone_id, instance_id, x, y, z, heading, slot) VALUES (%u, "
-			 "%u, %u, %f, %f, %f, %f, %i)",
-			 character_id, bind.zoneId, bind.instance_id, bind.x, bind.y, bind.z, bind.heading, bind_num);
+	std::string query = "";
 
-	Log(Logs::General, Logs::None, "ZoneDatabase::SaveCharacterBindPoint for character ID: %i zone_id: %u "
-					   "instance_id: %u position: %f %f %f %f bind_num: %u",
-		character_id, bind.zoneId, bind.instance_id, bind.x, bind.y, bind.z, bind.heading, bind_num);
+	SaveCharacterBindPointQuery(character_id, bind, bind_num, query);
 
 	auto results = QueryDatabase(query);
 	if (!results.RowsAffected())
@@ -1541,12 +1550,25 @@ bool ZoneDatabase::SaveCharacterDisc(uint32 character_id, uint32 slot_id, uint32
 	return true;
 }
 
+void ZoneDatabase::SaveCharacterTributeQuery(uint32 character_id, PlayerProfile_Struct* pp, std::string& query) {
+	 query += StringFormat("DELETE FROM `character_tribute` WHERE `id` = %u;", character_id);
+
+	/* Save Tributes only if we have values... */
+	for (int i = 0; i < EQEmu::invtype::TRIBUTE_SIZE; i++) {
+		if (pp->tributes[i].tribute >= 0 && pp->tributes[i].tribute != TRIBUTE_NONE) {
+			query += StringFormat("REPLACE INTO `character_tribute` (id, tier, tribute) VALUES (%u, %u, %u);", character_id, pp->tributes[i].tier, pp->tributes[i].tribute);
+		
+			Log(Logs::General, Logs::None, "ZoneDatabase::SaveCharacterTribute for character ID: %i, tier:%u tribute:%u done", character_id, pp->tributes[i].tier, pp->tributes[i].tribute);
+		}
+	}
+}
+
 bool ZoneDatabase::SaveCharacterTribute(uint32 character_id, PlayerProfile_Struct* pp){
 	std::string query = StringFormat("DELETE FROM `character_tribute` WHERE `id` = %u", character_id);
 	QueryDatabase(query);
 	/* Save Tributes only if we have values... */
-	for (int i = 0; i < EQEmu::invtype::TRIBUTE_SIZE; i++){
-		if (pp->tributes[i].tribute >= 0 && pp->tributes[i].tribute != TRIBUTE_NONE){
+	for (int i = 0; i < EQEmu::invtype::TRIBUTE_SIZE; i++) {
+		if (pp->tributes[i].tribute >= 0 && pp->tributes[i].tribute != TRIBUTE_NONE) {
 			std::string query = StringFormat("REPLACE INTO `character_tribute` (id, tier, tribute) VALUES (%u, %u, %u)", character_id, pp->tributes[i].tier, pp->tributes[i].tribute);
 			QueryDatabase(query);
 			Log(Logs::General, Logs::None, "ZoneDatabase::SaveCharacterTribute for character ID: %i, tier:%u tribute:%u done", character_id, pp->tributes[i].tier, pp->tributes[i].tribute);
@@ -1587,16 +1609,19 @@ bool ZoneDatabase::SaveCharacterLeadershipAA(uint32 character_id, PlayerProfile_
 	return true;
 }
 
-bool ZoneDatabase::SaveCharacterData(uint32 character_id, uint32 account_id, PlayerProfile_Struct* pp, ExtendedProfile_Struct* m_epp){
-	
+void ZoneDatabase::SaveCharacterDataQuery(uint32 character_id, uint32 account_id, PlayerProfile_Struct* pp, ExtendedProfile_Struct* m_epp, std::string& query) 
+{
+
 	/* If this is ever zero - the client hasn't fully loaded and potentially crashed during zone */
 	if (account_id <= 0)
-		return false;
-	
+	{
+		return;
+	}
+
 	std::string mail_key = database.GetMailKey(character_id);
 
-	clock_t t = std::clock(); /* Function timer start */
-	std::string query = StringFormat(
+	
+	 query += StringFormat(
 		"REPLACE INTO `character_data` ("
 		" id,                        "
 		" account_id,                "
@@ -1790,7 +1815,7 @@ bool ZoneDatabase::SaveCharacterData(uint32 character_id, uint32 account_id, Pla
 		"%u,"  // e_expended_aa_spent
 		"%u,"  // e_last_invsnapshot
 		"'%s'" // mailkey					  mail_key
-		")",
+		");",
 		character_id,					  // " id,                        "
 		account_id,						  // " account_id,                "
 		EscapeString(pp->name).c_str(),						  // " `name`,                    "
@@ -1886,13 +1911,23 @@ bool ZoneDatabase::SaveCharacterData(uint32 character_id, uint32 account_id, Pla
 		m_epp->expended_aa,
 		m_epp->last_invsnapshot_time,
 		mail_key.c_str()
-	);
+			);
+	
+}
+
+bool ZoneDatabase::SaveCharacterData(uint32 character_id, uint32 account_id, PlayerProfile_Struct* pp, ExtendedProfile_Struct* m_epp){
+	
+	/* If this is ever zero - the client hasn't fully loaded and potentially crashed during zone */
+	if (account_id <= 0)
+		return false;
+	clock_t t = std::clock(); /* Function timer start */
+	std::string query = "";
+	SaveCharacterDataQuery(character_id, account_id, pp, m_epp, query);
 	auto results = database.QueryDatabase(query);
 	Log(Logs::General, Logs::None, "ZoneDatabase::SaveCharacterData %i, done... Took %f seconds", character_id, ((float)(std::clock() - t)) / CLOCKS_PER_SEC);
 	return true;
 }
-
-bool ZoneDatabase::SaveCharacterCurrency(uint32 character_id, PlayerProfile_Struct* pp){
+void ZoneDatabase::SaveCharacterCurrencyQuery(uint32 character_id, PlayerProfile_Struct* pp, std::string& query) {
 	if (pp->copper < 0) { pp->copper = 0; }
 	if (pp->silver < 0) { pp->silver = 0; }
 	if (pp->gold < 0) { pp->gold = 0; }
@@ -1905,12 +1940,12 @@ bool ZoneDatabase::SaveCharacterCurrency(uint32 character_id, PlayerProfile_Stru
 	if (pp->gold_cursor < 0) { pp->gold_cursor = 0; }
 	if (pp->silver_cursor < 0) { pp->silver_cursor = 0; }
 	if (pp->copper_cursor < 0) { pp->copper_cursor = 0; }
-	std::string query = StringFormat(
+	query += StringFormat(
 		"REPLACE INTO `character_currency` (id, platinum, gold, silver, copper,"
 		"platinum_bank, gold_bank, silver_bank, copper_bank,"
 		"platinum_cursor, gold_cursor, silver_cursor, copper_cursor, "
 		"radiant_crystals, career_radiant_crystals, ebon_crystals, career_ebon_crystals)"
-		"VALUES (%u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u)",
+		"VALUES (%u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u);",
 		character_id,
 		pp->platinum,
 		pp->gold,
@@ -1928,6 +1963,12 @@ bool ZoneDatabase::SaveCharacterCurrency(uint32 character_id, PlayerProfile_Stru
 		pp->careerRadCrystals,
 		pp->currentEbonCrystals,
 		pp->careerEbonCrystals);
+	
+}
+bool ZoneDatabase::SaveCharacterCurrency(uint32 character_id, PlayerProfile_Struct* pp){
+	
+	std::string query = "";
+	SaveCharacterCurrencyQuery(character_id, pp,query);
 	auto results = database.QueryDatabase(query);
 	Log(Logs::General, Logs::None, "Saving Currency for character ID: %i, done", character_id);
 	return true;
@@ -2013,10 +2054,10 @@ bool ZoneDatabase::NoRentExpired(const char* name){
 	return (seconds>1800);
 }
 
-bool ZoneDatabase::SaveCharacterInvSnapshot(uint32 character_id) {
+std::string ZoneDatabase::SaveCharacterInvSnapshotQuery(uint32 character_id) {
 	uint32 time_index = time(nullptr);
 	std::string query = StringFormat(
-		"INSERT "
+		"INSERT IGNORE"
 		"INTO"
 		" `inventory_snapshots` "
 		"(`time_index`,"
@@ -2058,10 +2099,14 @@ bool ZoneDatabase::SaveCharacterInvSnapshot(uint32 character_id) {
 		"FROM"
 		" `inventory` "
 		"WHERE"
-		" `charid` = %u",
+		" `charid` = %u;",
 		time_index,
 		character_id
 	);
+	return query;
+}
+bool ZoneDatabase::SaveCharacterInvSnapshot(uint32 character_id) {
+	std::string query = SaveCharacterInvSnapshotQuery(character_id);
 	auto results = database.QueryDatabase(query);
 	Log(Logs::Moderate, Logs::Inventory, "ZoneDatabase::SaveCharacterInventorySnapshot %i (%s)", character_id, (results.Success() ? "pass" : "fail"));
 	return results.Success();
@@ -3557,6 +3602,34 @@ void ZoneDatabase::UpdateAltCurrencyValue(uint32 char_id, uint32 currency_id, ui
 
 }
 
+
+void ZoneDatabase::SaveBuffsQuery(Client *client, std::string& query) {
+
+	query += StringFormat("DELETE FROM `character_buffs` WHERE `character_id` = '%u';", client->CharacterID());
+
+
+	uint32 buff_count = client->GetMaxBuffSlots();
+	Buffs_Struct *buffs = client->GetBuffs();
+
+	for (int index = 0; index < buff_count; index++) {
+		if (buffs[index].spellid == SPELL_UNKNOWN)
+			continue;
+
+		query += StringFormat("INSERT INTO `character_buffs` (character_id, slot_id, spell_id, "
+			"caster_level, caster_name, ticsremaining, counters, numhits, melee_rune, "
+			"magic_rune, persistent, dot_rune, caston_x, caston_y, caston_z, ExtraDIChance, "
+			"instrument_mod) "
+			"VALUES('%u', '%u', '%u', '%u', '%s', '%d', '%u', '%u', '%u', '%u', '%u', '%u', "
+			"'%i', '%i', '%i', '%i', '%i');", client->CharacterID(), index, buffs[index].spellid,
+			buffs[index].casterlevel, buffs[index].caster_name, buffs[index].ticsremaining,
+			buffs[index].counters, buffs[index].numhits, buffs[index].melee_rune,
+			buffs[index].magic_rune, buffs[index].persistant_buff, buffs[index].dot_rune,
+			buffs[index].caston_x, buffs[index].caston_y, buffs[index].caston_z,
+			buffs[index].ExtraDIChance, buffs[index].instrument_mod);
+
+	}
+	
+}
 void ZoneDatabase::SaveBuffs(Client *client) {
 
 	std::string query = StringFormat("DELETE FROM `character_buffs` WHERE `character_id` = '%u'", client->CharacterID());
@@ -3566,21 +3639,21 @@ void ZoneDatabase::SaveBuffs(Client *client) {
 	Buffs_Struct *buffs = client->GetBuffs();
 
 	for (int index = 0; index < buff_count; index++) {
-		if(buffs[index].spellid == SPELL_UNKNOWN)
-            continue;
+		if (buffs[index].spellid == SPELL_UNKNOWN)
+			continue;
 
 		query = StringFormat("INSERT INTO `character_buffs` (character_id, slot_id, spell_id, "
-                            "caster_level, caster_name, ticsremaining, counters, numhits, melee_rune, "
-                            "magic_rune, persistent, dot_rune, caston_x, caston_y, caston_z, ExtraDIChance, "
-							"instrument_mod) "
-                            "VALUES('%u', '%u', '%u', '%u', '%s', '%d', '%u', '%u', '%u', '%u', '%u', '%u', "
-                            "'%i', '%i', '%i', '%i', '%i')", client->CharacterID(), index, buffs[index].spellid,
-                            buffs[index].casterlevel, buffs[index].caster_name, buffs[index].ticsremaining,
-                            buffs[index].counters, buffs[index].numhits, buffs[index].melee_rune,
-                            buffs[index].magic_rune, buffs[index].persistant_buff, buffs[index].dot_rune,
-                            buffs[index].caston_x, buffs[index].caston_y, buffs[index].caston_z,
-                            buffs[index].ExtraDIChance, buffs[index].instrument_mod);
-       QueryDatabase(query);
+			"caster_level, caster_name, ticsremaining, counters, numhits, melee_rune, "
+			"magic_rune, persistent, dot_rune, caston_x, caston_y, caston_z, ExtraDIChance, "
+			"instrument_mod) "
+			"VALUES('%u', '%u', '%u', '%u', '%s', '%d', '%u', '%u', '%u', '%u', '%u', '%u', "
+			"'%i', '%i', '%i', '%i', '%i')", client->CharacterID(), index, buffs[index].spellid,
+			buffs[index].casterlevel, buffs[index].caster_name, buffs[index].ticsremaining,
+			buffs[index].counters, buffs[index].numhits, buffs[index].melee_rune,
+			buffs[index].magic_rune, buffs[index].persistant_buff, buffs[index].dot_rune,
+			buffs[index].caston_x, buffs[index].caston_y, buffs[index].caston_z,
+			buffs[index].ExtraDIChance, buffs[index].instrument_mod);
+		QueryDatabase(query);
 	}
 }
 
@@ -3711,6 +3784,94 @@ void ZoneDatabase::LoadAuras(Client *c)
 		c->MakeAura(atoi(row[0]));
 }
 
+void ZoneDatabase::SavePetInfoQuery(Client *client, std::string& query)
+{
+	PetInfo *petinfo = nullptr;
+
+	query += StringFormat("DELETE FROM `character_pet_buffs` WHERE `char_id` = %u;", client->CharacterID());
+	
+	query += StringFormat("DELETE FROM `character_pet_inventory` WHERE `char_id` = %u;", client->CharacterID());
+	
+
+	for (int pet = 0; pet < 2; pet++) {
+		petinfo = client->GetPetInfo(pet);
+		if (!petinfo)
+			continue;
+
+		query += StringFormat("INSERT INTO `character_pet_info` "
+			"(`char_id`, `pet`, `petname`, `petpower`, `spell_id`, `hp`, `mana`, `size`) "
+			"VALUES (%u, %u, '%s', %i, %u, %u, %u, %f) "
+			"ON DUPLICATE KEY UPDATE `petname` = '%s', `petpower` = %i, `spell_id` = %u, "
+			"`hp` = %u, `mana` = %u, `size` = %f;",
+			client->CharacterID(), pet, petinfo->Name, petinfo->petpower, petinfo->SpellID,
+			petinfo->HP, petinfo->Mana, petinfo->size, // and now the ON DUPLICATE ENTRIES
+			petinfo->Name, petinfo->petpower, petinfo->SpellID, petinfo->HP, petinfo->Mana, petinfo->size);
+		
+		// pet buffs!
+		int max_slots = RuleI(Spells, MaxTotalSlotsPET);
+		
+		bool addedToQuery = false;
+		for (int index = 0; index < max_slots; index++) {
+			
+			if (petinfo->Buffs[index].spellid == SPELL_UNKNOWN || petinfo->Buffs[index].spellid == 0)
+			{
+				continue;
+			}
+			addedToQuery = true;
+			if (query.length() == 0)
+			{
+		
+				query += StringFormat("INSERT INTO `character_pet_buffs` "
+				"(`char_id`, `pet`, `slot`, `spell_id`, `caster_level`, "
+				"`ticsremaining`, `counters`, `instrument_mod`) "
+				"VALUES (%u, %u, %u, %u, %u, %d, %d, %u)",
+				client->CharacterID(), pet, index, petinfo->Buffs[index].spellid,
+				petinfo->Buffs[index].level, petinfo->Buffs[index].duration,
+				petinfo->Buffs[index].counters, petinfo->Buffs[index].bard_modifier);
+			}
+			else
+			{
+				query += StringFormat(", (%u, %u, %u, %u, %u, %d, %d, %u)",
+					client->CharacterID(), pet, index, petinfo->Buffs[index].spellid,
+					petinfo->Buffs[index].level, petinfo->Buffs[index].duration,
+					petinfo->Buffs[index].counters, petinfo->Buffs[index].bard_modifier);
+			}
+		}
+		if (addedToQuery)
+		{
+			query += ";";
+
+		}
+		addedToQuery = false;
+		// pet inventory!
+		for (int index = EQEmu::invslot::EQUIPMENT_BEGIN; index <= EQEmu::invslot::EQUIPMENT_END; index++) {
+		
+			if (!petinfo->Items[index])
+			{
+				continue;
+			}
+			addedToQuery = true;
+			if (query.length() == 0)
+			{
+				query += StringFormat("INSERT INTO `character_pet_inventory` "
+					"(`char_id`, `pet`, `slot`, `item_id`) "
+					"VALUES (%u, %u, %u, %u)",
+					client->CharacterID(), pet, index, petinfo->Items[index]);
+			}
+			else
+			{
+				query += StringFormat(", (%u, %u, %u, %u)", client->CharacterID(), pet, index, petinfo->Items[index]);
+			}
+		}
+		if (addedToQuery)
+		{
+			query += ";";
+
+		}
+		
+	}
+}
+
 void ZoneDatabase::SavePetInfo(Client *client)
 {
 	PetInfo *petinfo = nullptr;
@@ -3731,13 +3892,13 @@ void ZoneDatabase::SavePetInfo(Client *client)
 			continue;
 
 		query = StringFormat("INSERT INTO `character_pet_info` "
-				"(`char_id`, `pet`, `petname`, `petpower`, `spell_id`, `hp`, `mana`, `size`) "
-				"VALUES (%u, %u, '%s', %i, %u, %u, %u, %f) "
-				"ON DUPLICATE KEY UPDATE `petname` = '%s', `petpower` = %i, `spell_id` = %u, "
-				"`hp` = %u, `mana` = %u, `size` = %f",
-				client->CharacterID(), pet, petinfo->Name, petinfo->petpower, petinfo->SpellID,
-				petinfo->HP, petinfo->Mana, petinfo->size, // and now the ON DUPLICATE ENTRIES
-				petinfo->Name, petinfo->petpower, petinfo->SpellID, petinfo->HP, petinfo->Mana, petinfo->size);
+			"(`char_id`, `pet`, `petname`, `petpower`, `spell_id`, `hp`, `mana`, `size`) "
+			"VALUES (%u, %u, '%s', %i, %u, %u, %u, %f) "
+			"ON DUPLICATE KEY UPDATE `petname` = '%s', `petpower` = %i, `spell_id` = %u, "
+			"`hp` = %u, `mana` = %u, `size` = %f",
+			client->CharacterID(), pet, petinfo->Name, petinfo->petpower, petinfo->SpellID,
+			petinfo->HP, petinfo->Mana, petinfo->size, // and now the ON DUPLICATE ENTRIES
+			petinfo->Name, petinfo->petpower, petinfo->SpellID, petinfo->HP, petinfo->Mana, petinfo->size);
 		results = database.QueryDatabase(query);
 		if (!results.Success())
 			return;
@@ -3750,17 +3911,17 @@ void ZoneDatabase::SavePetInfo(Client *client)
 				continue;
 			if (query.length() == 0)
 				query = StringFormat("INSERT INTO `character_pet_buffs` "
-						"(`char_id`, `pet`, `slot`, `spell_id`, `caster_level`, "
-						"`ticsremaining`, `counters`, `instrument_mod`) "
-						"VALUES (%u, %u, %u, %u, %u, %d, %d, %u)",
-						client->CharacterID(), pet, index, petinfo->Buffs[index].spellid,
-						petinfo->Buffs[index].level, petinfo->Buffs[index].duration,
-						petinfo->Buffs[index].counters, petinfo->Buffs[index].bard_modifier);
+					"(`char_id`, `pet`, `slot`, `spell_id`, `caster_level`, "
+					"`ticsremaining`, `counters`, `instrument_mod`) "
+					"VALUES (%u, %u, %u, %u, %u, %d, %d, %u)",
+					client->CharacterID(), pet, index, petinfo->Buffs[index].spellid,
+					petinfo->Buffs[index].level, petinfo->Buffs[index].duration,
+					petinfo->Buffs[index].counters, petinfo->Buffs[index].bard_modifier);
 			else
 				query += StringFormat(", (%u, %u, %u, %u, %u, %d, %d, %u)",
-						client->CharacterID(), pet, index, petinfo->Buffs[index].spellid,
-						petinfo->Buffs[index].level, petinfo->Buffs[index].duration,
-						petinfo->Buffs[index].counters, petinfo->Buffs[index].bard_modifier);
+					client->CharacterID(), pet, index, petinfo->Buffs[index].spellid,
+					petinfo->Buffs[index].level, petinfo->Buffs[index].duration,
+					petinfo->Buffs[index].counters, petinfo->Buffs[index].bard_modifier);
 		}
 		database.QueryDatabase(query);
 		query.clear();
@@ -3772,9 +3933,9 @@ void ZoneDatabase::SavePetInfo(Client *client)
 
 			if (query.length() == 0)
 				query = StringFormat("INSERT INTO `character_pet_inventory` "
-						"(`char_id`, `pet`, `slot`, `item_id`) "
-						"VALUES (%u, %u, %u, %u)",
-						client->CharacterID(), pet, index, petinfo->Items[index]);
+					"(`char_id`, `pet`, `slot`, `item_id`) "
+					"VALUES (%u, %u, %u, %u)",
+					client->CharacterID(), pet, index, petinfo->Items[index]);
 			else
 				query += StringFormat(", (%u, %u, %u, %u)", client->CharacterID(), pet, index, petinfo->Items[index]);
 		}
